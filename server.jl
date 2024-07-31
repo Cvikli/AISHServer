@@ -13,6 +13,7 @@ end
 route("/api/set_path", method = POST) do 
   html("Hello set_path")
 end
+# curl -X GET http://localhost:8000/api/update_system_prompt
 # curl -X POST http://localhost:8000/api/refresh_project
 route("/api/refresh_project", method = POST) do 
   html("Hello refresh_project")
