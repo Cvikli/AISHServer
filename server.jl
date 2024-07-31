@@ -29,10 +29,13 @@ end
 route("/api/process_message", method = POST) do 
   html("Hello process_message")
 end
+# curl -X GET http://localhost:8000/api/system_prompt  (or this could be in the intialized stuff...)
+# curl -X PUT http://localhost:8000/api/update_system_prompt -d '{"prompt": "New system prompt"}'
 # curl -X GET http://localhost:8000/api/project_structure
+# curl -X POST http://localhost:8000/api/benchmark/run
+# curl -X GET http://localhost:8000/api/benchmark/results
 # curl -X PUT http://localhost:8000/api/change_model -d '{"model": "new-model-name"}'
 # curl -X POST http://localhost:8000/api/execute_command -d '{"command": "ls -la"}'
-# curl -X PUT http://localhost:8000/api/update_system_prompt -d '{"prompt": "New system prompt"}'
 
 
 up(8001, async = false)
