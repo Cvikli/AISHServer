@@ -1,42 +1,103 @@
-using AISH 
-using Genie, Genie.Renderer, Genie.Renderer.Html, Genie.Renderer.Json
+using Genie
+using Genie.Router
+using Genie.Requests
+using Genie.Renderer.Json
+using HTTP
+using JSON: json
+
+using AISH: initialize_ai_state, set_project_path, update_system_prompt!,
+get_conversation_history, generate_new_conversation,
+process_query, AIState, conversation_to_dict, system_prompt
+
+global ai_state::AIState = AIState()
+
+const AI_STATE_NOT_INITIALIZED_ERROR = Dict("status" => "error", "message" => "AI state not initialized")
+
+handle_interrupt(sig::Int32) = (println("\nExiting gracefully. Good bye! :)"); exit(0))
+ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, Cvoid, (Int32,)))
 
 
-route("/", method = GET) do 
-  html("Hello World")
-end
-# curl -X GET http://localhost:8000/api/initialize
+is_ai_state_initialized() = !isnothing(ai_state)
+
+# Configure CORS
+Genie.config.cors_headers["Access-Control-Allow-Origin"] = "*"
+Genie.config.cors_headers["Access-Control-Allow-Headers"] = "Content-Type"
+Genie.config.cors_headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+
+Genie.config.run_as_server = true
+
+# API routes
 route("/api/initialize", method = GET) do 
-  html("Hello initialize")
+  global ai_state = initialize_ai_state()
+  @show ai_state.conversation_sentences
+  json(Dict(
+      "status" => "success",
+      "message" => "AI state initialized",
+      "system_prompt" => system_prompt(ai_state).content,
+      "conversation_id" => ai_state.selected_conv_id,
+      "available_conversations" =>  ai_state.conversation_sentences,
+  ))
 end
-# curl -X POST http://localhost:8000/api/set_path -d '{"path": "/path/to/project"}'
+
 route("/api/set_path", method = POST) do 
-  html("Hello set_path")
+  path = jsonpayload()["path"]
+  isempty(path) && return json(Dict("status" => "error", "message" => "Path not provided"))
+  set_project_path(path)
+  json(Dict("status" => "success", "message" => "Project path set to "))
 end
-# curl -X GET http://localhost:8000/api/update_system_prompt
-# curl -X POST http://localhost:8000/api/refresh_project
+
+route("/api/update_system_prompt", method = GET) do 
+  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+  update_system_prompt!(ai_state)
+  json(Dict("status" => "success", "message" => "System prompt updated"))
+end
+
 route("/api/refresh_project", method = POST) do 
-  html("Hello refresh_project")
+  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+  update_system_prompt!(ai_state)
+  json(Dict("status" => "success", "message" => "Project refreshed and system prompt updated"))
 end
-# curl -X POST http://localhost:8000/api/new_conversation
+
 route("/api/new_conversation", method = POST) do 
-  html("Hello new_conversation")
+  global ai_state
+  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+  new_id = generate_new_conversation(ai_state)
+  json(Dict("status" => "success", "message" => "New conversation started", "conversation_id" => new_id))
 end
-# curl -X GET http://localhost:8000/api/conversation_history '{"conversation_id": "lfjweflkjwefklj"}'
-route("/api/select_converstaion", method = GET) do 
-  html("Hello select_converstaion")
+
+route("/api/select_conversation", method = POST) do 
+  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+  
+  conversation_id = jsonpayload()["conversation_id"]
+  isempty(conversation_id) && return json(Dict("status" => "error", "message" => "Conversation ID not provided"))
+  @show conversation_id
+  if ai_state.selected_conv_id !== conversation_id
+      loaded_conversation = get_conversation_history(conversation_id)
+      @show loaded_conversation[2:end]
+      isempty(loaded_conversation) && return json(Dict("status" => "error", "message" => "Conversation not found"))
+      ai_state.conversation[conversation_id] = loaded_conversation
+      ai_state.selected_conv_id = conversation_id
+  end
+  @show ai_state.conversation[conversation_id][2:end]
+  json(Dict("status" => "success", "message" => "Conversation selected and loaded", "history" => conversation_to_dict(ai_state)))
 end
-# curl -X POST http://localhost:8000/api/process_message -d '{"message": "User message here"}'
+
 route("/api/process_message", method = POST) do 
-  html("Hello process_message")
+  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+  
+  user_message = jsonpayload()["message"]
+  @show user_message
+  display.(["--->>" * msg.content for msg in ai_state.conversation])
+  response = process_query(ai_state, user_message)    
+
+  json(Dict("status" => "success", "response" => response, 
+  "conversation_id" =>ai_state.selected_conv_id, 
+  "firstsentence"=> ai_state.conversation_sentences[ai_state.selected_conv_id]))
 end
-# curl -X GET http://localhost:8000/api/system_prompt  (or this could be in the intialized stuff...)
-# curl -X PUT http://localhost:8000/api/update_system_prompt -d '{"prompt": "New system prompt"}'
-# curl -X GET http://localhost:8000/api/project_structure
-# curl -X POST http://localhost:8000/api/benchmark/run
-# curl -X GET http://localhost:8000/api/benchmark/results
-# curl -X PUT http://localhost:8000/api/change_model -d '{"model": "new-model-name"}'
-# curl -X POST http://localhost:8000/api/execute_command -d '{"command": "ls -la"}'
 
+# route("/api/conversation_history", method = GET) do
+#   !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+#   json(Dict("status" => "success", "history" => conversation_to_dict(ai_state)))
+# end
 
-up(8001, async = false)
+up(8001, "0.0.0.0", async = false)
