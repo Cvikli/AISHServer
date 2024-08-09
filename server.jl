@@ -5,11 +5,15 @@ using Genie.Renderer.Json
 using HTTP
 using Dates
 using JSON: json
+using Sockets, JSON
 
 using AISH: initialize_ai_state, set_project_path, update_system_prompt!,
-select_conversation, generate_new_conversation,
-process_query, AIState, conversation_to_dict, system_prompt, streaming_process_query,
-cur_conv_msgs, update_message_with_outputs, add_n_save_ai_message!
+  select_conversation, generate_new_conversation,
+  process_query, AIState, conversation_to_dict, system_prompt, streaming_process_query,
+  cur_conv_msgs, update_message_with_outputs, add_n_save_ai_message!
+
+
+const ROUTER = HTTP.Router()
 
 global ai_state::AIState = initialize_ai_state() # = AIState()
 
@@ -17,8 +21,6 @@ const AI_STATE_NOT_INITIALIZED_ERROR = Dict("status" => "error", "message" => "A
 
 handle_interrupt(sig::Int32) = (println("\nExiting gracefully. Good bye! :)"); exit(0))
 ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, Cvoid, (Int32,)))
-
-is_ai_state_initialized() = !isnothing(ai_state)
 
 # Configure CORS
 Genie.config.cors_headers["Access-Control-Allow-Origin"] = "*"
@@ -47,24 +49,21 @@ route("/api/set_path", method = POST) do
 end
 
 route("/api/update_system_prompt", method = POST) do 
-  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
   update_system_prompt!(ai_state, new_system_prompt=jsonpayload()["conversation_id"])
   json(Dict("status" => "success", "message" => "System prompt updated"))
 end
 
 route("/api/refresh_project", method = GET) do 
-  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
   update_system_prompt!(ai_state)
   json(Dict("status" => "success", "message" => "System prompt refreshed"))
 end
 
 route("/api/new_conversation", method = POST) do 
-  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
+  @show "test?"
   new_id = generate_new_conversation(ai_state)
   json(Dict("status" => "success", "message" => "New conversation started", "conversation_id" => new_id))
 end
 route("/api/select_conversation", method = POST) do 
-  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
   
   conversation_id = jsonpayload()["conversation_id"]
   @show conversation_id
@@ -75,8 +74,6 @@ route("/api/select_conversation", method = POST) do
 end
 
 route("/api/process_message", method = POST) do 
-  !is_ai_state_initialized() && return json(AI_STATE_NOT_INITIALIZED_ERROR)
-  
   user_message = jsonpayload()["message"]
   msg = process_query(ai_state, user_message)    
 
@@ -84,57 +81,8 @@ route("/api/process_message", method = POST) do
             "timestamp" => Dates.format(msg.timestamp, "yyyy-mm-dd_HH:MM:SS"), 
             "conversation_id" => ai_state.selected_conv_id))
 end
-channel("/stream/process_message") do
-  params = jsonpayload()
-  @show params
-  try
-    user_message = params["new_message"]
-    @show user_message
-    Genie.Renderer.streamresponse() do io
-      channel = streaming_process_query(ai_state, user_message)
-      @show "channel??"
-      for text in channel
-        @show "yes-yes!"
-        write(io, "data: $text\n\n")
-        flush(io)
-      end
-      @show "done!"
-      write(io, "data: [DONE]\n\n")
-      write(io, "all:  $(ai_state.conversation[end].content)")
-      flush(io)
-    end
-  catch e
-    Json.json(:error => sprint(showerror, e))
-  end
-end
-# Genie.Router.channel("/stream/process_message") do ws
-#   @show "?"
-#   while !eof(ws)
-#     data = JSON.parse(String(WebSockets.receive(ws)))
-#     @show data
-#     user_message = get(data, "new_message", "")
-#     @show user_message
-        
-#         if !is_ai_state_initialized()
-#             WebSockets.send(ws, json(AI_STATE_NOT_INITIALIZED_ERROR))
-#             continue
-#         end
-        
-#         channel = streaming_process_query(ai_state, user_message)
-#         for text in channel
-#           @show text
-#             WebSockets.send(ws, "data: $text")
-#         end
-#         WebSockets.send(ws, "data: [DONE]")
-#         WebSockets.send(ws, "all: $(ai_state.conversation[ai_state.selected_conv_id][end].content)")
-#     end
-# end
 
-using HTTP, Sockets, JSON
-
-const ROUTER = HTTP.Router()
-
-function events(stream::HTTP.Stream)
+function process_message(stream::HTTP.Stream)
   data = JSON.parse(String(readavailable(stream)))
   @show data
   user_message = get(data, "new_message", "")
@@ -170,7 +118,7 @@ function events(stream::HTTP.Stream)
   # write(stream, "all: $(cur_conv_msgs(ai_state)[end].content)")
   return nothing
 end
-HTTP.register!(ROUTER, "/stream/process_message", events)
+HTTP.register!(ROUTER, "/stream/process_message", process_message)
 
 
 server = HTTP.serve!(ROUTER, "127.0.0.1", 8080; stream=true)
