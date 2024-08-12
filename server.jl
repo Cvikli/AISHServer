@@ -112,8 +112,8 @@ function process_message(stream::HTTP.Stream)
   end
   write(stream, "---------[DONE]-------")
   updated_content = update_message_with_outputs(whole_txt)
-  add_n_save_ai_message!(ai_state, updated_content)
   write(stream, "all: $(updated_content)")
+  add_n_save_ai_message!(ai_state, updated_content)
   @show "Finished"
   # write(stream, "all: $(cur_conv_msgs(ai_state)[end].content)")
   return nothing
