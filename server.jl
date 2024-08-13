@@ -2,6 +2,7 @@ using Revise
 using RelevanceStacktrace
 using HTTP
 using Dates
+using JSON
 using JSON: json, parse
 using Sockets
 
@@ -13,18 +14,21 @@ using AISH: initialize_ai_state, set_project_path, update_system_prompt!,
 handle_interrupt(sig::Int32) = (println("\nExiting gracefully. Good bye! :)"); exit(0))
 ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, Cvoid, (Int32,)))
 
-const ROUTER = HTTP.Router()
-const ROUTER_Stream = HTTP.Router()
-
 global ai_state::AIState = initialize_ai_state() # = AIState()
 
-const AI_STATE_NOT_INITIALIZED_ERROR = Dict("status" => "error", "message" => "AI state not initialized")
+const ROUTER = HTTP.Router()
+# const ROUTER_Stream = HTTP.Router()
 
 
-HTTP.serve!(ROUTER, "0.0.0.0", 8001)
-HTTP.serve!(ROUTER_Stream, "0.0.0.0", 8002; stream=true)
+include("CORS.jl")
+include("APIEndpoints.jl")
+# include("APIEndpointsStream.jl")
+
+HTTP.serve!(with_cors(ROUTER), "0.0.0.0", 8001)
+# HTTP.serve!(with_cors(ROUTER_Stream), "0.0.0.0", 8002; stream=true)
+
 
 entr(["APIEndpoints.jl", "APIEndpointsStream.jl"], [], postpone=true, pause=1.00) do
-  include("APIEndpoints.jl")
+  include("APIEndpoints.jl")  
   include("APIEndpointsStream.jl")
 end
