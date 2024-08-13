@@ -1,15 +1,16 @@
 
-HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", stream::HTTP.Stream -> begin
+HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(req::HTTP.Request) 
+  stream = HTTP.stream(req)
   @show stream
-  data = parse(String(readavailable(stream)))
+  data = JSON.parse(String(read(stream)))
   @show data
   user_message = get(data, "new_message", "")
   @show user_message
 
-  HTTP.setheader(stream, "Access-Control-Allow-Origin" => "*")
-  HTTP.setheader(stream, "Access-Control-Allow-Methods" => "GET,POST,PUT,DELETE,OPTIONS")
-  HTTP.setheader(stream, "Content-Type" => "text/event-stream")
-  HTTP.setheader(stream, "Cache-Control" => "no-cache")
+  HTTP.setheader(req, "Access-Control-Allow-Origin" => "*")
+  HTTP.setheader(req, "Access-Control-Allow-Methods" => "GET,POST,PUT,DELETE,OPTIONS")
+  HTTP.setheader(req, "Content-Type" => "text/event-stream")
+  HTTP.setheader(req, "Cache-Control" => "no-cache")
 
   HTTP.method(stream.message) == "OPTIONS" && return nothing
 
