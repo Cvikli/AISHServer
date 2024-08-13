@@ -21,36 +21,10 @@ global ai_state::AIState = initialize_ai_state() # = AIState()
 const AI_STATE_NOT_INITIALIZED_ERROR = Dict("status" => "error", "message" => "AI state not initialized")
 
 
-
-function start_server()
-    server_task = @async try
-        include("APIEndpoints.jl")
-        HTTP.serve(ROUTER, "0.0.0.0", 8001)
-    catch e
-        e === :stop || rethrow()
-    end
-    errormonitor(server_task)
-end
-
-function start_server_stream()
-    server_stream_task = @async try
-        include("APIEndpointsStream.jl")
-        HTTP.serve(ROUTER_Stream, "0.0.0.0", 8002; stream=true)
-    catch e
-        e === :stop || rethrow()
-    end
-    errormonitor(server_stream_task)
-end
-
-function stop_server(task)
-  schedule(task, :stop, error=true)
-  wait(task)
-end
-
-server_task[], server_stream_task[] = start_server(), start_server_stream()
+HTTP.serve!(ROUTER, "0.0.0.0", 8001)
+HTTP.serve!(ROUTER_Stream, "0.0.0.0", 8002; stream=true)
 
 entr(["APIEndpoints.jl", "APIEndpointsStream.jl"], [], postpone=true, pause=1.00) do
-  stop_server(server_task[])
-  stop_server(server_stream_task[])
-  server_task[], server_stream_task[] = start_server(), start_server_stream()
+  include("APIEndpoints.jl")
+  include("APIEndpointsStream.jl")
 end
