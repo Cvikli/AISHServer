@@ -62,3 +62,25 @@ HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Re
         "conversation_id" => ai_state.selected_conv_id
     )))
 end)
+
+HTTP.register!(ROUTER, "GET", "/api/get_current_path", function(request::HTTP.Request)
+    return HTTP.Response(200, JSON.json(Dict(
+        "status" => "success",
+        "current_path" => ai_state.project_path
+    )))
+end)
+
+# Updated endpoint to list folders and files separately
+HTTP.register!(ROUTER, "GET", "/api/list_items", function(request::HTTP.Request)
+    project_path = ai_state.project_path
+    if isempty(project_path)
+        project_path = pwd()  # Use the current working directory if no project path is set
+    end
+    return HTTP.Response(200, JSON.json(Dict(
+        "status" => "success",
+        "current_path" => project_path,
+        "folders" => [item for item in readdir(project_path) if isdir(joinpath(project_path, item))],
+        "files" => [item for item in readdir(project_path) if isfile(joinpath(project_path, item))]
+    )))
+end)
+
