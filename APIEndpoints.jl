@@ -1,6 +1,6 @@
 # API routes
 HTTP.register!(ROUTER, "GET", "/api/initialize", function(request::HTTP.Request)
-    global ai_state = initialize_ai_state()
+    global ai_state = initialize_ai_state(streaming=false)
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success",
         "message" => "AI state initialized",
