@@ -46,19 +46,16 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTT
     if !haskey(ai_state.conversation, conversation_id)
         return HTTP.Response(404, JSON.json(Dict("status" => "error", "message" => "Conversation not found")))
     end
-    if ai_state.selected_conv_id !== conversation_id
-        select_conversation(ai_state, conversation_id)
-    end
+    ai_state.selected_conv_id !== conversation_id && select_conversation(ai_state, conversation_id)
     return HTTP.Response(200, JSON.json(Dict("status" => "success", 
         "message" => "Conversation selected and loaded", 
         "history" => conversation_to_dict(ai_state),
-        "system_prompt" => system_prompt(ai_state).content,)))
+        "system_prompt" => system_prompt(ai_state).content)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Request)
     data = JSON.parse(String(request.body))
-    user_message = get(data, "message", "")
-    msg = process_query(ai_state, user_message)    
+    msg = process_query(ai_state, get(data, "message", ""))    
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success", 
         "response" => msg.content, 
@@ -74,12 +71,8 @@ HTTP.register!(ROUTER, "GET", "/api/get_current_path", function(request::HTTP.Re
     )))
 end)
 
-# Updated endpoint to list folders and files separately
 HTTP.register!(ROUTER, "GET", "/api/list_items", function(request::HTTP.Request)
-    project_path = ai_state.project_path
-    if isempty(project_path)
-        project_path = pwd()  # Use the current working directory if no project path is set
-    end
+    project_path = isempty(ai_state.project_path) ? pwd() : ai_state.project_path
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success",
         "current_path" => project_path,
