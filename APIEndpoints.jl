@@ -13,11 +13,9 @@ end)
 HTTP.register!(ROUTER, "POST", "/api/set_path", function(request::HTTP.Request)
     data = JSON.parse(String(request.body))
     path = get(data, "path", "")
-    if isempty(path)
-        return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Path not provided")))
-    end
-    set_project_path(path)
-    return HTTP.Response(200, JSON.json(Dict("status" => "success", "message" => "Project path set")))
+    isempty(path) && return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Path not provided")))
+    update_project_path!(ai_state, path)
+    return HTTP.Response(200, JSON.json(Dict("status" => "success", "message" => "Project path set", "system_prompt" => system_prompt(ai_state).content)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/update_system_prompt", function(request::HTTP.Request)
@@ -33,7 +31,10 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/new_conversation", function(request::HTTP.Request)
     new_id = generate_new_conversation(ai_state)
-    return HTTP.Response(200, JSON.json(Dict("status" => "success", "message" => "New conversation started", "conversation_id" => new_id)))
+    return HTTP.Response(200, JSON.json(Dict("status" => "success", 
+        "system_prompt" => system_prompt(ai_state).content,
+        "message" => "New conversation started", 
+        "conversation_id" => new_id)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTTP.Request)
@@ -48,7 +49,10 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTT
     if ai_state.selected_conv_id !== conversation_id
         select_conversation(ai_state, conversation_id)
     end
-    return HTTP.Response(200, JSON.json(Dict("status" => "success", "message" => "Conversation selected and loaded", "history" => conversation_to_dict(ai_state))))
+    return HTTP.Response(200, JSON.json(Dict("status" => "success", 
+        "message" => "Conversation selected and loaded", 
+        "history" => conversation_to_dict(ai_state),
+        "system_prompt" => system_prompt(ai_state).content,)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Request)
