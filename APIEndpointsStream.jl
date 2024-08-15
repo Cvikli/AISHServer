@@ -1,35 +1,30 @@
 
-HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(req::HTTP.Request) 
-  stream = HTTP.stream(req)
-  @show stream
+HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream::HTTP.Stream) 
   data = JSON.parse(String(read(stream)))
-  @show data
   user_message = get(data, "new_message", "")
   @show user_message
 
-  HTTP.setheader(req, "Access-Control-Allow-Origin" => "*")
-  HTTP.setheader(req, "Access-Control-Allow-Methods" => "GET,POST,PUT,DELETE,OPTIONS")
-  HTTP.setheader(req, "Content-Type" => "text/event-stream")
-  HTTP.setheader(req, "Cache-Control" => "no-cache")
 
-  HTTP.method(stream.message) == "OPTIONS" && return nothing
+    write(stream, "event: start\ndata: Stream started\n\n")
+    flush(stream)
+
+    write(stream, "event: ping\ndata: $(round(Int, time()))\n\n")
+    flush(stream)
 
 
-  write(stream, "event: ping\ndata: $(round(Int, time()))\n\n")
+    channel = streaming_process_query(ai_state, user_message)
+    whole_txt = ""
 
-  # channel = stream_anthropic_response("Hello, tell me a short story")
-  channel = streaming_process_query(ai_state, user_message)
-  @show channel
-  whole_txt = ""
-  for text in channel
-    whole_txt *= text
-    write(stream, text)
-  end
-  write(stream, "---------[DONE]-------")
-  updated_content = update_message_with_outputs(whole_txt)
-  write(stream, "all: $(updated_content)")
-  add_n_save_ai_message!(ai_state, updated_content)
-  @show "Finished"
-  # write(stream, "all: $(cur_conv_msgs(ai_state)[end].content)")
-  return nothing
+    for text in channel
+        whole_txt *= text
+        write(stream, "event: message\ndata: $(JSON.json(Dict("content" => text)))\n\n")
+        flush(stream)
+    end
+    
+    updated_content = update_message_with_outputs(whole_txt)
+    add_n_save_ai_message!(ai_state, updated_content)
+    write(stream, "event: done\ndata: $(JSON.json(Dict("content" => updated_content)))\n\n")
+    flush(stream)
+    println("$(updated_content)")
+    return nothing
 end)

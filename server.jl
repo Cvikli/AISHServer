@@ -17,18 +17,18 @@ ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, C
 global ai_state::AIState = initialize_ai_state(streaming=false) # = AIState()
 
 const ROUTER = HTTP.Router()
-# const ROUTER_Stream = HTTP.Router()
+const ROUTER_Stream = HTTP.Router()
 
 include("CORS.jl")
 include("APIEndpoints.jl")
-# include("APIEndpointsStream.jl")
+include("APIEndpointsStream.jl")
 
+HTTP.serve!(with_cors_stream(ROUTER_Stream), "0.0.0.0", 8002; stream=true)
 HTTP.serve!(with_cors(ROUTER), "0.0.0.0", 8001)
-# HTTP.serve!(with_cors(ROUTER_Stream), "0.0.0.0", 8002; stream=true)
 
 
-# entr(["APIEndpoints.jl", "APIEndpointsStream.jl"], [], postpone=true, pause=1.00) do
-entr(["APIEndpoints.jl"], [], postpone=true, pause=1.00) do
+entr(["APIEndpoints.jl", "APIEndpointsStream.jl"], [], postpone=true, pause=1.00) do
+# entr(["APIEndpoints.jl"], [], postpone=true, pause=1.00) do
   include("APIEndpoints.jl")  
-  # include("APIEndpointsStream.jl")
+  include("APIEndpointsStream.jl")
 end
