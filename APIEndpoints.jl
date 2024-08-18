@@ -71,8 +71,10 @@ HTTP.register!(ROUTER, "GET", "/api/get_current_path", function(request::HTTP.Re
     )))
 end)
 
-HTTP.register!(ROUTER, "GET", "/api/list_items", function(request::HTTP.Request)
-    project_path = isempty(ai_state.project_path) ? pwd() : ai_state.project_path
+HTTP.register!(ROUTER, "POST", "/api/list_items", function(request::HTTP.Request)
+    data = JSON.parse(String(request.body))
+    path = get(data, "path", "")   
+    project_path = isempty(path) ? isempty(ai_state.project_path) ? pwd() : ai_state.project_path : path
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success",
         "current_path" => project_path,

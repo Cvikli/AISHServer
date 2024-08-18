@@ -1,5 +1,3 @@
-
-
 # CORS middleware
 function cors_middleware_stream(handler)
     return function(stream::HTTP.Stream)
