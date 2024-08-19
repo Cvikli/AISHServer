@@ -5,26 +5,32 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
   @show user_message
 
 
-    write(stream, "event: start\ndata: Stream started\n\n")
+  write(stream, "event: start\ndata: $(JSON.json(Dict("content" => "Stream started")))\n\n")
+  flush(stream)
+
+  write(stream, "event: ping\ndata: $(round(Int, time()))\n\n")
+  flush(stream)
+
+
+  channel, in_meta, out_meta = streaming_process_query(ai_state, user_message)
+  whole_txt = ""
+
+  for text in channel
+    whole_txt *= text
+    write(stream, "event: message\ndata: $(JSON.json(Dict("content" => text)))\n\n")
     flush(stream)
-
-    write(stream, "event: ping\ndata: $(round(Int, time()))\n\n")
-    flush(stream)
-
-
-    channel = streaming_process_query(ai_state, user_message)
-    whole_txt = ""
-
-    for text in channel
-        whole_txt *= text
-        write(stream, "event: message\ndata: $(JSON.json(Dict("content" => text)))\n\n")
-        flush(stream)
-    end
-    
-    updated_content = update_message_with_outputs(whole_txt)
-    add_n_save_ai_message!(ai_state, updated_content)
-    write(stream, "event: done\ndata: $(JSON.json(Dict("content" => updated_content)))\n\n")
-    flush(stream)
-    println("$(updated_content)")
-    return nothing
+  end
+  
+  updated_content = update_message_with_outputs(whole_txt)
+  add_n_save_ai_message!(ai_state, updated_content)
+  @show to_dict(in_meta)
+  write(stream, "event: in_meta\ndata: $(JSON.json(to_dict(in_meta)))\n\n")
+  flush(stream)
+  @show to_dict(out_meta)
+  write(stream, "event: out_meta\ndata: $(JSON.json(to_dict(out_meta)))\n\n")
+  flush(stream)
+  write(stream, "event: done\ndata: $(JSON.json(Dict("content" => updated_content)))\n\n")
+  flush(stream)
+  println("$(updated_content)")
+  return nothing
 end)

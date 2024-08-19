@@ -30,11 +30,11 @@ HTTP.register!(ROUTER, "GET", "/api/refresh_project", function(request::HTTP.Req
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/new_conversation", function(request::HTTP.Request)
-    new_id = generate_new_conversation(ai_state)
+    conversation = generate_new_conversation(ai_state)
     return HTTP.Response(200, JSON.json(Dict("status" => "success", 
         "system_prompt" => system_prompt(ai_state).content,
         "message" => "New conversation started", 
-        "conversation_id" => new_id)))
+        "conversation" => conversation)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTTP.Request)
@@ -59,7 +59,7 @@ HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Re
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success", 
         "response" => msg.content, 
-        "timestamp" => Dates.format(msg.timestamp, "yyyy-mm-dd_HH:MM:SS"), 
+        "timestamp" => datetime2unix(msg.timestamp), 
         "conversation_id" => ai_state.selected_conv_id
     )))
 end)
@@ -75,6 +75,7 @@ HTTP.register!(ROUTER, "POST", "/api/list_items", function(request::HTTP.Request
     data = JSON.parse(String(request.body))
     path = get(data, "path", "")   
     project_path = isempty(path) ? isempty(ai_state.project_path) ? pwd() : ai_state.project_path : path
+    @show project_path
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success",
         "current_path" => project_path,
