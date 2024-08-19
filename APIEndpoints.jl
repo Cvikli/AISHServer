@@ -4,8 +4,8 @@ HTTP.register!(ROUTER, "GET", "/api/initialize", function(request::HTTP.Request)
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success",
         "message" => "AI state initialized",
-        "system_prompt" => system_prompt(ai_state).content,
         "conversation_id" => ai_state.selected_conv_id,
+        "system_prompt" => system_prompt(ai_state).content,
         "available_conversations" => ai_state.conversation,
     )))
 end)
@@ -31,9 +31,10 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/new_conversation", function(request::HTTP.Request)
     conversation = generate_new_conversation(ai_state)
+    @show conversation
     return HTTP.Response(200, JSON.json(Dict("status" => "success", 
-        "system_prompt" => system_prompt(ai_state).content,
         "message" => "New conversation started", 
+        "system_prompt" => system_prompt(ai_state).content,
         "conversation" => conversation)))
 end)
 
@@ -49,7 +50,7 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTT
     ai_state.selected_conv_id !== conversation_id && select_conversation(ai_state, conversation_id)
     return HTTP.Response(200, JSON.json(Dict("status" => "success", 
         "message" => "Conversation selected and loaded", 
-        "history" => conversation_to_dict(ai_state),
+        "history" => conversation_to_dict(ai_state)[2:end],
         "system_prompt" => system_prompt(ai_state).content)))
 end)
 
@@ -58,9 +59,9 @@ HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Re
     msg = process_query(ai_state, get(data, "message", ""))    
     return HTTP.Response(200, JSON.json(Dict(
         "status" => "success", 
-        "response" => msg.content, 
         "timestamp" => datetime2unix(msg.timestamp), 
-        "conversation_id" => ai_state.selected_conv_id
+        "conversation_id" => ai_state.selected_conv_id,
+        "response" => msg.content, 
     )))
 end)
 
