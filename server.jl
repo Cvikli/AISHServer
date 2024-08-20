@@ -8,9 +8,9 @@ using Sockets
 using Anthropic: to_dict
 
 using AISH: initialize_ai_state, update_project_path!, update_system_prompt!,
-  select_conversation, generate_new_conversation,
-  process_query, AIState, conversation_to_dict, system_prompt, cur_conv_msgs, streaming_process_query,
-   update_message_with_outputs, add_n_save_ai_message!
+  select_conversation, generate_new_conversation, cmd_all_info,
+  process_query, AIState, conversation_to_dict, cur_conv_msgs, streaming_process_query,
+   update_message_with_outputs, add_n_save_ai_message!, system_message
 
 handle_interrupt(sig::Int32) = (println("\nExiting gracefully. Good bye! :)"); exit(0))
 ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, Cvoid, (Int32,)))
