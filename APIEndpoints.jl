@@ -18,17 +18,6 @@ HTTP.register!(ROUTER, "POST", "/api/set_path", function(request::HTTP.Request)
     return OK(Dict("status" => "success", "message" => "Project path set", "system_prompt" => system_message(ai_state)))
 end)
 
-HTTP.register!(ROUTER, "POST", "/api/update_system_prompt", function(request::HTTP.Request)
-    data = JSON.parse(String(request.body))
-    update_system_prompt!(ai_state, new_system_prompt=get(data, "conversation_id", ""))
-    return HTTP.Response(200, JSON.json(Dict("status" => "success", "message" => "System prompt updated")))
-end)
-
-HTTP.register!(ROUTER, "GET", "/api/refresh_project", function(request::HTTP.Request)
-    update_system_prompt!(ai_state)
-    return HTTP.Response(200, JSON.json(Dict("status" => "success", "message" => "System prompt refreshed")))
-end)
-
 HTTP.register!(ROUTER, "POST", "/api/new_conversation", function(request::HTTP.Request)
     conversation = generate_new_conversation(ai_state)
     @show conversation
