@@ -57,14 +57,14 @@ end)
 HTTP.register!(ROUTER, "GET", "/api/get_current_path", function(request::HTTP.Request)
     return OK(Dict(
         "status" => "success",
-        "current_path" => curr_conv(ai_state).project_path
+        "current_path" => curr_conv(ai_state).rel_project_paths[1]
     ))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/list_items", function(request::HTTP.Request)
     data = JSON.parse(String(request.body))
     path = get(data, "path", "")   
-    project_path = isempty(path) ? isempty(curr_conv(ai_state).project_path) ? pwd() : curr_conv(ai_state).project_path : path
+    project_path = isempty(path) ? isempty(curr_conv(ai_state).rel_project_paths) ? pwd() : curr_conv(ai_state).rel_project_paths[1] : path
     @show project_path
     return OK(Dict(
         "status" => "success",
