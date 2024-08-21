@@ -11,9 +11,9 @@ HTTP.register!(ROUTER, "GET", "/api/initialize", function(request::HTTP.Request)
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/set_path", function(request::HTTP.Request)
-    data = JSON.parse(String(request.body))
+    data = parse(String(request.body))
     path = get(data, "path", "")
-    isempty(path) && return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Path not provided")))
+    isempty(path) && return HTTP.Response(400, json(Dict("status" => "error", "message" => "Path not provided")))
     update_project_path_and_sysprompt!(ai_state, [path])
     return OK(Dict("status" => "success", "message" => "Project path set", "system_prompt" => system_message(ai_state)))
 end)
@@ -28,13 +28,13 @@ HTTP.register!(ROUTER, "POST", "/api/new_conversation", function(request::HTTP.R
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTTP.Request)
-    data = JSON.parse(String(request.body))
+    data = parse(String(request.body))
     conversation_id = get(data, "conversation_id", "")
     if isempty(conversation_id)
-        return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Conversation ID not provided")))
+        return HTTP.Response(400, json(Dict("status" => "error", "message" => "Conversation ID not provided")))
     end
     if !haskey(ai_state.conversations, conversation_id)
-        return HTTP.Response(404, JSON.json(Dict("status" => "error", "message" => "Conversation not found")))
+        return HTTP.Response(404, json(Dict("status" => "error", "message" => "Conversation not found")))
     end
     ai_state.selected_conv_id !== conversation_id && select_conversation(ai_state, conversation_id)
     return OK(Dict("status" => "success", 
@@ -44,7 +44,7 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTT
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Request)
-    data = JSON.parse(String(request.body))
+    data = parse(String(request.body))
     msg = process_question(ai_state, get(data, "message", ""))    
     return OK(Dict(
         "status" => "success", 
@@ -62,7 +62,7 @@ HTTP.register!(ROUTER, "GET", "/api/get_current_path", function(request::HTTP.Re
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/list_items", function(request::HTTP.Request)
-    data = JSON.parse(String(request.body))
+    data = parse(String(request.body))
     path = get(data, "path", "")   
     project_path = isempty(path) ? isempty(curr_conv(ai_state).rel_project_paths) ? pwd() : curr_conv(ai_state).rel_project_paths[1] : path
     @show project_path
@@ -75,10 +75,10 @@ HTTP.register!(ROUTER, "POST", "/api/list_items", function(request::HTTP.Request
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/execute_block", function(request::HTTP.Request)
-    data = JSON.parse(String(request.body))
+    data = parse(String(request.body))
     code = get(data, "code", "")
     if isempty(code)
-        return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Code block not provided")))
+        return HTTP.Response(400, json(Dict("status" => "error", "message" => "Code block not provided")))
     end
     
     result = cmd_all_info(`zsh -c $code`)
@@ -90,6 +90,5 @@ HTTP.register!(ROUTER, "POST", "/api/execute_block", function(request::HTTP.Requ
     ))
 end)
 
-# Helper function for OK 200 JSON responses
-OK(data) = return HTTP.Response(200, JSON.json(data))
+OK(data) = return HTTP.Response(200, json(data))
 
