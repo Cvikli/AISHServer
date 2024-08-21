@@ -15,7 +15,7 @@ using AISH: initialize_ai_state, update_project_path!, update_system_prompt!,
 handle_interrupt(sig::Int32) = (println("\nExiting gracefully. Good bye! :)"); exit(0))
 ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, Cvoid, (Int32,)))
 
-global ai_state::AIState = initialize_ai_state(streaming=false) # = AIState()
+global ai_state::AIState = initialize_ai_state(streaming=false, skip_code_execution=true) # = AIState()
 
 const ROUTER = HTTP.Router()
 const ROUTER_Stream = HTTP.Router()

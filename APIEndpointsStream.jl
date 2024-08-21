@@ -31,12 +31,13 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
     flush(stream)
   end
   
-  updated_content = update_message_with_outputs(whole_txt)
-  add_n_save_ai_message!(ai_state, updated_content)
   ai_meta.elapsed = ai_meta.elapsed - start_time - user_meta.elapsed
   @show to_dict(ai_meta)
   write(stream, "event: ai_meta\ndata: $(JSON.json(to_dict(ai_meta)))\n\n")
   flush(stream)
+  
+  updated_content = ai_state.skip_code_execution ? whole_txt : update_message_with_outputs(whole_txt)
+  add_n_save_ai_message!(ai_state, updated_content)
   write(stream, "event: done\ndata: $(JSON.json(Dict("content" => updated_content)))\n\n")
   flush(stream)
   println("$(updated_content)")
