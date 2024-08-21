@@ -6,7 +6,7 @@ HTTP.register!(ROUTER, "GET", "/api/initialize", function(request::HTTP.Request)
         "message" => "AI state initialized",
         "conversation_id" => ai_state.selected_conv_id,
         "system_prompt" => system_message(ai_state),
-        "available_conversations" => ai_state.conversation,
+        "available_conversations" => ai_state.conversations,
     ))
 end)
 
@@ -33,7 +33,7 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTT
     if isempty(conversation_id)
         return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Conversation ID not provided")))
     end
-    if !haskey(ai_state.conversation, conversation_id)
+    if !haskey(ai_state.conversations, conversation_id)
         return HTTP.Response(404, JSON.json(Dict("status" => "error", "message" => "Conversation not found")))
     end
     ai_state.selected_conv_id !== conversation_id && select_conversation(ai_state, conversation_id)
@@ -45,7 +45,7 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Request)
     data = JSON.parse(String(request.body))
-    msg = process_query(ai_state, get(data, "message", ""))    
+    msg = process_question(ai_state, get(data, "message", ""))    
     return OK(Dict(
         "status" => "success", 
         "timestamp" => datetime2unix(msg.timestamp), 

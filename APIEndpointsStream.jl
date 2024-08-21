@@ -5,7 +5,7 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
   @show user_message
 
 
-  channel, user_meta, ai_meta, start_time = streaming_process_query(ai_state, user_message)
+  channel, user_meta, ai_meta, start_time = streaming_process_question(ai_state, user_message)
 
   write(stream, "event: start\ndata: $(JSON.json(Dict("content" => "Stream started")))\n\n")
   flush(stream)
@@ -18,6 +18,7 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
   whole_txt = first_text
 
   user_meta.elapsed -= start_time
+  update_last_user_message_meta(ai_state, user_meta)
   write(stream, "event: user_meta\ndata: $(JSON.json(to_dict(user_meta)))\n\n")
   flush(stream)
 
