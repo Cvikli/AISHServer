@@ -14,7 +14,7 @@ HTTP.register!(ROUTER, "POST", "/api/set_path", function(request::HTTP.Request)
     data = JSON.parse(String(request.body))
     path = get(data, "path", "")
     isempty(path) && return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Path not provided")))
-    update_project_path!(ai_state, path)
+    update_project_path_and_sysprompt!(ai_state, [path])
     return OK(Dict("status" => "success", "message" => "Project path set", "system_prompt" => system_message(ai_state)))
 end)
 
@@ -39,7 +39,7 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", function(request::HTT
     ai_state.selected_conv_id !== conversation_id && select_conversation(ai_state, conversation_id)
     return OK(Dict("status" => "success", 
         "message" => "Conversation selected and loaded", 
-        "history" => conversation_to_dict(ai_state, with_sysprompt=false),
+        "history" => to_dict_nosys_detailed(ai_state),
         "system_prompt" => system_message(ai_state)))
 end)
 
@@ -57,14 +57,14 @@ end)
 HTTP.register!(ROUTER, "GET", "/api/get_current_path", function(request::HTTP.Request)
     return OK(Dict(
         "status" => "success",
-        "current_path" => ai_state.project_path
+        "current_path" => curr_conv(ai_state).project_path
     ))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/list_items", function(request::HTTP.Request)
     data = JSON.parse(String(request.body))
     path = get(data, "path", "")   
-    project_path = isempty(path) ? isempty(ai_state.project_path) ? pwd() : ai_state.project_path : path
+    project_path = isempty(path) ? isempty(curr_conv(ai_state).project_path) ? pwd() : curr_conv(ai_state).project_path : path
     @show project_path
     return OK(Dict(
         "status" => "success",

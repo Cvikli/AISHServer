@@ -18,7 +18,6 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
   whole_txt = first_text
 
   user_meta.elapsed -= start_time
-  @show to_dict(user_meta)
   write(stream, "event: user_meta\ndata: $(JSON.json(to_dict(user_meta)))\n\n")
   flush(stream)
 
@@ -35,9 +34,9 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
   @show to_dict(ai_meta)
   write(stream, "event: ai_meta\ndata: $(JSON.json(to_dict(ai_meta)))\n\n")
   flush(stream)
-  
+
   updated_content = ai_state.skip_code_execution ? whole_txt : update_message_with_outputs(whole_txt)
-  add_n_save_ai_message!(ai_state, updated_content)
+  add_n_save_ai_message!(ai_state, updated_content, ai_meta)
   write(stream, "event: done\ndata: $(JSON.json(Dict("content" => updated_content)))\n\n")
   flush(stream)
   println("$(updated_content)")
