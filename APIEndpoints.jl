@@ -15,7 +15,7 @@ HTTP.register!(ROUTER, "POST", "/api/set_path", function(request::HTTP.Request)
     path = get(data, "path", "")
     isempty(path) && return HTTP.Response(400, JSON.json(Dict("status" => "error", "message" => "Path not provided")))
     update_project_path!(ai_state, path)
-    return OK(Dict("status" => "success", "message" => "Project path set", "system_prompt" => system_prompt(ai_state)))
+    return OK(Dict("status" => "success", "message" => "Project path set", "system_prompt" => system_message(ai_state)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/update_system_prompt", function(request::HTTP.Request)
