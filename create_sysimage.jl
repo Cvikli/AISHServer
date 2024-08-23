@@ -3,7 +3,6 @@ using PackageCompiler
 # List of packages to precompile
 packages_to_precompile = [
     "HTTP",
-    "Dates",
     "JSON",
     "Anthropic",
     "Revise",
