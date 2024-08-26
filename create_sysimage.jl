@@ -16,3 +16,5 @@ create_sysimage(
 )
 
 println("Custom system image created: CustomAISHServer.so")
+
+# julia -JCustomAISHServer.so ./server.jl

@@ -1,9 +1,11 @@
 # API routes
 HTTP.register!(ROUTER, "GET", "/api/initialize", function(request::HTTP.Request)
-    global ai_state = initialize_ai_state(streaming=false, skip_code_execution=true)
+    # global ai_state = initialize_ai_state(streaming=false, skip_code_execution=true)
     return OK(Dict(
         "status" => "success",
         "message" => "AI state initialized",
+        "skip_code_execution" => ai_state.skip_code_execution,
+        "model" => ai_state.model,
         "conversation_id" => ai_state.selected_conv_id,
         "system_prompt" => system_message(ai_state),
         "available_conversations" => ai_state.conversations,
@@ -48,7 +50,7 @@ HTTP.register!(ROUTER, "POST", "/api/process_message", function(request::HTTP.Re
     msg = process_question(ai_state, get(data, "message", ""))    
     return OK(Dict(
         "status" => "success", 
-        "timestamp" => datetime2unix(msg.timestamp), 
+        "timestamp" => date_format(msg.timestamp), 
         "conversation_id" => ai_state.selected_conv_id,
         "response" => msg.content, 
     ))
@@ -77,16 +79,36 @@ end)
 HTTP.register!(ROUTER, "POST", "/api/execute_block", function(request::HTTP.Request)
     data = parse(String(request.body))
     code = get(data, "code", "")
-    if isempty(code)
-        return HTTP.Response(400, json(Dict("status" => "error", "message" => "Code block not provided")))
+    timestamp = get(data, "timestamp", nothing)
+    if isempty(code) || isnothing(timestamp) 
+        return HTTP.Response(400, json(Dict("status" => "error", "message" => "Code block or timestamp not provided")))
     end
     
     result = cmd_all_info(`zsh -c $code`)
+    
+    @show timestamp
+    idx, message = get_message_by_timestamp(ai_state, timestamp)
+    @show code
+    updated_content = replace(message.content, "```sh\n$code```" => "```sh\n$code```\n```sh_run_results\n$result\n```")
     @show result
+
+    updated_content = replace(updated_content, r"(```sh_run_results\n.*?```)((\s*```sh_run_results\n.*?```)*)"s => s"\1")
+
+    @show idx,"ok"
+    update_message_by_idx(ai_state, idx, updated_content)
     
     return OK(Dict(
         "status" => "success",
-        "result" => result
+        "result" => result,
+        "updated_content" => updated_content
+    ))
+end)
+
+HTTP.register!(ROUTER, "POST", "/api/toggle_auto_execute", function(request::HTTP.Request)
+    ai_state.skip_code_execution = !ai_state.skip_code_execution
+    return OK(Dict(
+        "status" => "success",
+        "skip_code_execution" => ai_state.skip_code_execution
     ))
 end)
 
