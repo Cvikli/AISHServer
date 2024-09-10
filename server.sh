@@ -1,0 +1,1 @@
+git ls-files | entr -r julia server.jl  
