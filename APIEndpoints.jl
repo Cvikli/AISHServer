@@ -75,7 +75,7 @@ HTTP.register!(ROUTER, "POST", "/api/execute_block", req -> begin
         code, timestamp = get(data, "code", ""), get(data, "timestamp", nothing)
         (isempty(code) || isnothing(timestamp)) && return ERROR(400, "Code block or timestamp not provided")
         
-        result = cmd_all_info(`zsh -c $code`)
+        result = execute_single_shell_command(code)
         idx, message = get_message_by_timestamp(ai_state, timestamp)
         isnothing(message) && return ERROR(404, "Message with given timestamp not found")
         updated_content = replace(message.content, "```sh\n$code```" => "```sh\n$code```\n```sh_run_results\n$result\n```")

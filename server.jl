@@ -4,6 +4,7 @@ using HTTP
 using Dates
 using JSON: json, parse
 using Anthropic: to_dict, process_stream
+using EasyContext: EasyContextCreatorV3
 
 include("task_manager.jl")
 
@@ -12,12 +13,12 @@ ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 2, @cfunction(handle_interrupt, C
 ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 15, @cfunction(handle_interrupt, Cvoid, (Int32,)))
 
 using AISH: initialize_ai_state, update_project_path_and_sysprompt!, 
-select_conversation, generate_new_conversation, cmd_all_info, curr_conv,
+select_conversation, generate_new_conversation, execute_single_shell_command, curr_conv,
 process_question, AIState, to_dict_nosys_detailed, curr_conv_msgs, streaming_process_question,
 update_message_with_outputs, add_n_save_ai_message!, system_message, 
 update_last_user_message_meta, get_message_by_timestamp, update_message_by_idx, date_format, curr_proj_path
 
-global ai_state::AIState = initialize_ai_state("claude-3-5-sonnet-20240620")
+global ai_state::AIState = initialize_ai_state("claude-3-5-sonnet-20240620", contexter=EasyContextCreatorV3())
 global task_manager = TaskManager()
 
 const ROUTER = HTTP.Router()
