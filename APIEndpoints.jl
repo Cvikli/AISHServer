@@ -1,17 +1,15 @@
 HTTP.register!(ROUTER, "GET", "/api/initialize", req -> begin
-@show ai_state.conversations[ai_state.selected_conv_id]
-    
-OK(
-    "AI state initialized",
-    Dict(
-        "skip_code_execution" => ai_state.skip_code_execution,
-        "model" => ai_state.model,
-        "conversation_id" => ai_state.selected_conv_id,
-        "system_prompt" => system_message(ai_state),
-        "project_path" => curr_proj_path(ai_state),
-        "available_conversations" => ai_state.conversations,
+    OK(
+        "AI state initialized",
+        Dict(
+            "skip_code_execution" => ai_state.skip_code_execution,
+            "model" => ai_state.model,
+            "conversation_id" => ai_state.selected_conv_id,
+            "system_prompt" => system_message(ai_state),
+            "project_path" => curr_proj_path(ai_state),
+            "available_conversations" => ai_state.conversations,
+        )
     )
-)
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/set_path", req -> begin
@@ -34,7 +32,11 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", req -> begin
     conversation_id = get(data, "conversation_id", "")
     isempty(conversation_id) && return ERROR(400, "Conversation ID not provided")
     !haskey(ai_state.conversations, conversation_id) && return ERROR(404, "Conversation not found")
-    ai_state.selected_conv_id !== conversation_id && select_conversation(ai_state, conversation_id)
+    if ai_state.selected_conv_id !== conversation_id 
+        file_exists = select_conversation(ai_state, conversation_id)
+        !file_exists && return ERROR(404, "Conversation not found")
+    end
+   
     OK("Conversation selected and loaded", Dict(
         "history" => to_dict_nosys_detailed(ai_state),
         "system_prompt" => system_message(ai_state)))
@@ -59,7 +61,6 @@ end)
 HTTP.register!(ROUTER, "POST", "/api/list_items", req -> begin
     data = parse(String(req.body))
     path = get(data, "path", "")   
-    @show path
     project_path = isempty(path) ? isempty(curr_conv(ai_state).rel_project_paths) ? pwd() : curr_proj_path(ai_state) : path
     @show project_path
     OK("Items listed", Dict(
@@ -75,7 +76,7 @@ HTTP.register!(ROUTER, "POST", "/api/execute_block", req -> begin
         code, timestamp = get(data, "code", ""), get(data, "timestamp", nothing)
         (isempty(code) || isnothing(timestamp)) && return ERROR(400, "Code block or timestamp not provided")
         
-        result = execute_single_shell_command(code)
+        result = execute_single_shell_command(ai_state, code)
         idx, message = get_message_by_timestamp(ai_state, timestamp)
         isnothing(message) && return ERROR(404, "Message with given timestamp not found")
         updated_content = replace(message.content, "```sh\n$code```" => "```sh\n$code```\n```sh_run_results\n$result\n```")
