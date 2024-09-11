@@ -30,7 +30,7 @@ end
 
 function execute_async(tm::TaskManager, id::String, func::Function)
     channel = Channel(32)
-    task = @async begin
+    task = @async_showerr begin
         try
             func(channel)
         finally

@@ -7,7 +7,6 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
         channel, user_msg, e = streaming_process_question(ai_state, user_message, shell_results)
         if !isnothing(e)
             error_message = "Error in streaming process: $(sprint(showerror, e))"
-            @error error_message exception=(e, catch_backtrace())
             write(stream, "event: error\ndata: $(json(Dict("content" => error_message)))\n\n")
             flush(stream)
             return
@@ -23,13 +22,16 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
             channel,
             ai_state.model,
             on_text = function(text)
+                print(text)
                 write(stream, "event: message\ndata: $(json(Dict("content" => text)))\n\n")
                 flush(stream)
             end,
             on_meta_usr = function(meta)
                 update_last_user_message_meta(ai_state, meta)
-                user_data = merge(meta, Dict("timestamp" => date_format(user_msg.timestamp)))
-                @show user_data
+                user_data = merge(meta, Dict(
+                    "id" => user_msg.id,
+                    "timestamp" => date_format(user_msg.timestamp)
+                    ))
                 write(stream, "event: user_meta\ndata: $(json(user_data))\n\n")
                 flush(stream)
             end,
@@ -38,27 +40,21 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
                 flush(stream)
             end,
             on_done = function()
+                println()
             end
         )
-        @show "finished"
         ai_msg = add_n_save_ai_message!(ai_state, full_response, ai_meta)
         ai_data = merge(ai_meta, Dict("timestamp" => date_format(ai_msg.timestamp)))
-        @show "finished2"
         write(stream, "event: ai_meta\ndata: $(json(ai_data))\n\n")
         flush(stream)
-        @show "finished2f323"
-        write(stream, "event: done\ndata: $(json(Dict("content" => full_response)))\n\n")
+        # write(stream, "event: done\ndata: $(json(Dict("content" => full_response)))\n\n")
+        write(stream, "event: done\ndata: $(json(Dict("content" => "")))\n\n")
         flush(stream)
-        @show "finished2f323f3f3"
-        @show "event: done\ndata: $(json(Dict("content" => full_response)))\n\n"
-        println("$(full_response)")
     catch e
         error_message = "Error in streaming process: $(sprint(showerror, e))"
         @error error_message exception=(e, catch_backtrace())
         write(stream, "event: error\ndata: $(json(Dict("content" => error_message)))\n\n")
         flush(stream)
-    # finally        
-    #     HTTP.startwrite(stream)
     end
 
     return
@@ -69,12 +65,16 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/execute_shell", function(stream::
         data = parse(String(read(stream)))
         command = get(data, "command", "")
 
-        task_id = string(UUIDs.uuid4())
-        channel = execute_async(task_manager, task_id) do ch
-            execute_shell_command_async(command, ch)
+        channel = Channel(32)
+        task = @async begin
+            try
+                execute_shell_command_async(command, channel)
+            finally
+                close(channel)
+            end
         end
 
-        write(stream, "event: start\ndata: $(json(Dict("content" => "Shell execution started", "task_id" => task_id)))\n\n")
+        write(stream, "event: start\ndata: $(json(Dict("content" => "Shell execution started")))\n\n")
         flush(stream)
 
         for output in channel
@@ -101,12 +101,16 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/select_folder", function(stream::
         data = parse(String(read(stream)))
         path = get(data, "path", "")
 
-        task_id = string(UUIDs.uuid4())
-        channel = execute_async(task_manager, task_id) do ch
-            select_folder_async(path, ch)
+        channel = Channel(32)
+        task = @async begin
+            try
+                select_folder_async(path, channel)
+            finally
+                close(channel)
+            end
         end
 
-        write(stream, "event: start\ndata: $(json(Dict("content" => "Folder selection started", "task_id" => task_id)))\n\n")
+        write(stream, "event: start\ndata: $(json(Dict("content" => "Folder selection started")))\n\n")
         flush(stream)
 
         for item in channel
@@ -134,12 +138,15 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/modify_file", function(stream::HT
         file_path = get(data, "file_path", "")
         modifications = get(data, "modifications", "")
 
-        task_id = string(UUIDs.uuid4())
-        channel = execute_async(task_manager, task_id) do ch
-            modify_file_async(file_path, modifications, ch)
+        channel = Channel(32)
+        task = @async begin
+            try
+                modify_file_async(file_path, modifications, channel)
+            finally
+                close(channel)
+            end
         end
-
-        write(stream, "event: start\ndata: $(json(Dict("content" => "File modification started", "task_id" => task_id)))\n\n")
+        write(stream, "event: start\ndata: $(json(Dict("content" => "File modification started")))\n\n")
         flush(stream)
 
         for update in channel
@@ -152,11 +159,10 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/modify_file", function(stream::HT
     catch e
         error_message = "Error in file modification: $(sprint(showerror, e))"
         @error error_message exception=(e, catch_backtrace())
-        write(stream, "event: error\ndata: $(json(Dict("content" => error_message)))\n\n")
+        write(stream, "event:error\ndata: $(json(Dict("content" => error_message)))\n\n")
         flush(stream)
     finally
         close(stream)
     end
-
     return
 end)
