@@ -79,18 +79,10 @@ HTTP.register!(ROUTER, "POST", "/api/get_whole_changes", req -> begin
         isempty(file_path) && return ERROR(400, "we couldn't generate the ai_command... maybe path problem? or file wrong format... or something?")
 
         # Generate diff directly from strings
-        @show "."
-        println(file_path)
-        @show ".d"
-        println(original_content)
-        @show ".dfe"
-        println(ai_generated_content)
         result, _ = diff_contents(String(original_content), String(ai_generated_content))
         
-        println("result")
-        println(result)
         cuttedpart = split(code, "\n")
-        result = [(:equal, "$(cuttedpart[1])\n", "") ; result; (:equal, "$(join(cuttedpart[end-2:end],'\n'))", "")]
+        result = [(:equal, "$(cuttedpart[1])\n", "", "") ; result; (:equal, "$(join(cuttedpart[end-2:end],'\n'))", "", "")]
 
         ai_generated_content = "$(cuttedpart[1])\n" * ai_generated_content * "$(join(cuttedpart[end-2:end],'\n'))"
 
