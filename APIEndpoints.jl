@@ -14,9 +14,8 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/set_path", req -> begin
     data = parse(String(req.body))
-    path = get(data, "path", "")
-    isempty(path) && return ERROR(400, "Path not provided")
-    update_project_path_and_sysprompt!(ai_state, [path])
+    !("path" in keys(data)) && return ERROR(400, "Path not provided")
+    update_project_path_and_sysprompt!(ai_state, [data["path"]])
     OK("Project path set", Dict("system_prompt" => system_message(ai_state)))
 end)
 
@@ -70,6 +69,44 @@ HTTP.register!(ROUTER, "POST", "/api/list_items", req -> begin
     ))
 end)
 
+HTTP.register!(ROUTER, "POST", "/api/get_whole_changes", req -> begin
+    try
+        data = parse(String(req.body))
+        code = get(data, "code", "")
+        isempty(code) && return ERROR(400, "Code block not provided")
+        
+        file_path, original_content, ai_generated_content = generate_ai_command_from_meld_code(code)
+        isempty(file_path) && return ERROR(400, "we couldn't generate the ai_command... maybe path problem? or file wrong format... or something?")
+
+        # Generate diff directly from strings
+        @show "."
+        println(file_path)
+        @show ".d"
+        println(original_content)
+        @show ".dfe"
+        println(ai_generated_content)
+        result, _ = diff_contents(String(original_content), String(ai_generated_content))
+        
+        println("result")
+        println(result)
+        cuttedpart = split(code, "\n")
+        result = [(:equal, "$(cuttedpart[1])\n", "") ; result; (:equal, "$(join(cuttedpart[end-2:end],'\n'))", "")]
+
+        ai_generated_content = "$(cuttedpart[1])\n" * ai_generated_content * "$(join(cuttedpart[end-2:end],'\n'))"
+
+        OK("Diff generated successfully", Dict(
+            "file_path" => file_path,
+            "original_content" => original_content,
+            "ai_generated_content" => ai_generated_content,
+            "diff" => result
+        ))
+    catch e
+        error_message = "Error generating diff: $(sprint(showerror, e))"
+        @error error_message exception=(e, catch_backtrace())
+        ERROR(500, error_message)
+    end
+end)
+
 HTTP.register!(ROUTER, "POST", "/api/execute_block", req -> begin
     try
         data = parse(String(req.body))
@@ -94,6 +131,44 @@ end)
 HTTP.register!(ROUTER, "POST", "/api/toggle_auto_execute", req -> begin
     ai_state.skip_code_execution = !ai_state.skip_code_execution
     OK("Auto-execute toggled", Dict("skip_code_execution" => ai_state.skip_code_execution))
+end)
+
+# New endpoint for saving a file
+HTTP.register!(ROUTER, "POST", "/api/save_file", req -> begin
+    try
+        data = parse(String(req.body))
+        filepath = get(data, "filepath", "")
+        content = get(data, "content", "")
+        
+        isempty(filepath) && return ERROR(400, "File path not provided")
+        isempty(content) && return ERROR(400, "Content not provided")
+        
+        write(filepath, content)
+        
+        OK("File saved successfully", Dict("filepath" => filepath))
+    catch e
+        error_message = "Error saving file: $(sprint(showerror, e))"
+        @error error_message exception=(e, catch_backtrace())
+        ERROR(500, error_message)
+    end
+end)
+
+# New endpoint for retrieving a file
+HTTP.register!(ROUTER, "GET", "/api/get_file", req -> begin
+    try
+        filepath = HTTP.queryparams(HTTP.URI(req.target))["filepath"]
+        
+        isempty(filepath) && return ERROR(400, "File path not provided")
+        !isfile(filepath) && return ERROR(404, "File not found")
+        
+        content = read(filepath, String)
+        
+        OK("File content retrieved", Dict("filepath" => filepath, "content" => content))
+    catch e
+        error_message = "Error retrieving file: $(sprint(showerror, e))"
+        @error error_message exception=(e, catch_backtrace())
+        ERROR(500, error_message)
+    end
 end)
 
 OK(data::Dict) = HTTP.Response(200, json(Dict("status" => "success", "message" => "", data...)))
