@@ -71,14 +71,19 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/get_whole_changes", req -> begin
     try
-        data = parse(String(req.body))
-        code = get(data, "code", "")
-        isempty(code) && return ERROR(400, "Code block not provided")
+        try
+            data = parse(String(req.body))
+            code, message_id, filepath = data["code"], data["msg_id"], data["file_path"]
+        catch
+            return ERROR(400, "code or msg_id or file_path not provided: $(req.body)")
+        end
         
         file_path, original_content, ai_generated_content = generate_ai_command_from_meld_code(code)
         isempty(file_path) && return ERROR(400, "we couldn't generate the ai_command... maybe path problem? or file wrong format... or something?")
 
         # Generate diff directly from strings
+        println(original_content)
+        println(ai_generated_content)
         result, _ = diff_contents(String(original_content), String(ai_generated_content))
         
         cuttedpart = split(code, "\n")
@@ -101,12 +106,15 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/execute_block", req -> begin
     try
-        data = parse(String(req.body))
-        code, timestamp = get(data, "code", ""), get(data, "timestamp", nothing)
-        (isempty(code) || isnothing(timestamp)) && return ERROR(400, "Code block or timestamp not provided")
+        try
+            data = parse(String(req.body))
+            code, message_id = data["code"], data["msg_id"]
+        catch
+            return ERROR(400, "code or msg_id not provided: $(req.body)")
+        end
         
-        result = execute_single_shell_command(ai_state, code)
-        idx, message = get_message_by_timestamp(ai_state, timestamp)
+        result = execute_single_shell_command(code, no_confirm=ai_state.no_confirm)
+        idx, message = get_message_by_id(ai_state, timestamp)
         isnothing(message) && return ERROR(404, "Message with given timestamp not found")
         updated_content = replace(message.content, "```sh\n$code```" => "```sh\n$code```\n```sh_run_results\n$result\n```")
         updated_content = replace(updated_content, r"(```sh_run_results\n.*?```)((\s*```sh_run_results\n.*?```)*)"s => s"\1")
@@ -135,9 +143,13 @@ HTTP.register!(ROUTER, "POST", "/api/save_file", req -> begin
         isempty(filepath) && return ERROR(400, "File path not provided")
         isempty(content) && return ERROR(400, "Content not provided")
         
-        write(filepath, content)
+        success = save_file(filepath, equalContent, deleteContent)
         
-        OK("File saved successfully", Dict("filepath" => filepath))
+        if success
+            OK("File saved successfully", Dict("filepath" => filepath))
+        else
+            ERROR(500, "Failed to save file")
+        end
     catch e
         error_message = "Error saving file: $(sprint(showerror, e))"
         @error error_message exception=(e, catch_backtrace())
