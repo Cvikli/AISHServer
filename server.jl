@@ -17,8 +17,8 @@ ccall(:signal, Ptr{Cvoid}, (Cint, Ptr{Cvoid}), 15, @cfunction(handle_interrupt, 
 
 using AISH: initialize_ai_state, update_project_path_and_sysprompt!, 
 select_conversation, generate_new_conversation, execute_single_shell_command, curr_conv,
-process_question, AIState, to_dict_nosys_detailed, curr_conv_msgs, streaming_process_question,
-update_message_with_outputs, add_n_save_ai_message!, system_message, 
+AIState, to_dict_nosys_detailed, curr_conv_msgs, streaming_process_question,
+add_n_save_ai_message!, system_message, 
 update_last_user_message_meta, get_message_by_id, update_message_by_idx, date_format, curr_proj_path,
 generate_ai_command_from_meld_code, save_file
 

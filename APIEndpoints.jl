@@ -41,21 +41,21 @@ HTTP.register!(ROUTER, "POST", "/api/select_conversation", req -> begin
         "system_prompt" => system_message(ai_state)))
 end)
 
-HTTP.register!(ROUTER, "POST", "/api/process_message", req -> begin
-    try
-        data = parse(String(req.body))
-        msg = process_question(ai_state, get(data, "message", ""))
-        OK("Message processed", Dict(
-            "timestamp" => date_format(msg.timestamp),
-            "conversation_id" => ai_state.selected_conv_id,
-            "response" => msg.content,
-        ))
-    catch e
-        error_message = "Error processing message: $(sprint(showerror, e))"
-        @error error_message exception=(e, catch_backtrace())
-        ERROR(500, error_message)
-    end
-end)
+# HTTP.register!(ROUTER, "POST", "/api/process_message", req -> begin
+#     try
+#         data = parse(String(req.body))
+#         msg = process_question(ai_state, get(data, "message", ""))
+#         OK("Message processed", Dict(
+#             "timestamp" => date_format(msg.timestamp),
+#             "conversation_id" => ai_state.selected_conv_id,
+#             "response" => msg.content,
+#         ))
+#     catch e
+#         error_message = "Error processing message: $(sprint(showerror, e))"
+#         @error error_message exception=(e, catch_backtrace())
+#         ERROR(500, error_message)
+#     end
+# end)
 
 HTTP.register!(ROUTER, "POST", "/api/list_items", req -> begin
     data = parse(String(req.body))
@@ -73,12 +73,12 @@ HTTP.register!(ROUTER, "POST", "/api/get_whole_changes", req -> begin
     try
         try
             data = parse(String(req.body))
-            code, message_id, filepath = data["code"], data["msg_id"], data["file_path"]
+            code, message_id, file_path = data["code"], data["msg_id"], data["file_path"]
         catch
             return ERROR(400, "code or msg_id or file_path not provided: $(req.body)")
         end
         
-        file_path, original_content, ai_generated_content = generate_ai_command_from_meld_code(code)
+        original_content, ai_generated_content = generate_ai_command_from_meld_code(code)
         isempty(file_path) && return ERROR(400, "we couldn't generate the ai_command... maybe path problem? or file wrong format... or something?")
 
         # Generate diff directly from strings
