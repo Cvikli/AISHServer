@@ -21,9 +21,8 @@ end)
 
 HTTP.register!(ROUTER, "POST", "/api/new_conversation", req -> begin
     conversation = generate_new_conversation(ai_state)
-    OK("New conversation started", Dict("system_prompt" => system_message(ai_state), "conversation" => conversation,
-    "project_path" => curr_proj_path(ai_state)
-    ))
+    OK( "New conversation started", Dict("system_prompt" => system_message(ai_state), "conversation" => conversation,
+        "project_path" => curr_proj_path(ai_state)))
 end)
 
 HTTP.register!(ROUTER, "POST", "/api/select_conversation", req -> begin
@@ -73,23 +72,24 @@ HTTP.register!(ROUTER, "POST", "/api/get_whole_changes", req -> begin
     try
         try
             data = parse(String(req.body))
-            code, message_id, file_path = data["code"], data["msg_id"], data["file_path"]
-        catch
+            code, code_type, file_path = data["code"], data["code_type"], data["file_path"]
+        catch e
+            @error sprint(showerror, e) exception=(e, catch_backtrace())
             return ERROR(400, "code or msg_id or file_path not provided: $(req.body)")
         end
         
-        original_content, ai_generated_content = generate_ai_command_from_meld_code(code)
+        cb = CodeBlock(type=code_type, file_path, language=language, pre_content=code)
+        original_content, ai_generated_content = generate_ai_command_from_meld_code(cb)
         isempty(file_path) && return ERROR(400, "we couldn't generate the ai_command... maybe path problem? or file wrong format... or something?")
 
         # Generate diff directly from strings
-        println(original_content)
-        println(ai_generated_content)
+        # println(original_content)
+        # println(ai_generated_content)
         result, _ = diff_contents(String(original_content), String(ai_generated_content))
         
-        cuttedpart = split(code, "\n")
-        result = [(:equal, "$(cuttedpart[1])\n", "", "") ; result; (:equal, "$(join(cuttedpart[end-2:end],'\n'))", "", "")]
-
-        ai_generated_content = "$(cuttedpart[1])\n" * ai_generated_content * "$(join(cuttedpart[end-2:end],'\n'))"
+        # cuttedpart = split(code, "\n")
+        # result = [(:equal, "$(cuttedpart[1])\n", "", "") ; result; (:equal, "$(join(cuttedpart[end-2:end],'\n'))", "", "")]
+        # ai_generated_content = "$(cuttedpart[1])\n" * ai_generated_content * "$(join(cuttedpart[end-2:end],'\n'))"
 
         OK("Diff generated successfully", Dict(
             "file_path" => file_path,
@@ -108,17 +108,21 @@ HTTP.register!(ROUTER, "POST", "/api/execute_block", req -> begin
     try
         try
             data = parse(String(req.body))
-            code, message_id = data["code"], data["msg_id"]
-        catch
-            return ERROR(400, "code or msg_id not provided: $(req.body)")
+            code, code_type, file_path, language = data["code"], data["code_type"], data["file_path"], data["language"]
+            # msg_id = data["msg_id"]
+        catch e
+            @error sprint(showerror, e) exception=(e, catch_backtrace())
+            return ERROR(400, "code or code_type file_path or language not provided: $(req.body)")
         end
         
-        result = execute_single_shell_command(code, no_confirm=ai_state.no_confirm)
-        idx, message = get_message_by_id(ai_state, timestamp)
+        cb = CodeBlock(type=code_type, file_path, language=language, pre_content=code)
+
+        result = execute_single_shell_command(cb, no_confirm=ai_state.no_confirm)
+        # idx, message = get_message_by_id(ai_state, msg_id)
         isnothing(message) && return ERROR(404, "Message with given timestamp not found")
-        updated_content = replace(message.content, "```sh\n$code```" => "```sh\n$code```\n```sh_run_results\n$result\n```")
-        updated_content = replace(updated_content, r"(```sh_run_results\n.*?```)((\s*```sh_run_results\n.*?```)*)"s => s"\1")
-        update_message_by_idx(ai_state, idx, updated_content)
+        # updated_content = replace(message.content, "```sh\n$code```" => "```sh\n$code```\n```sh_run_results\n$result\n```")
+        # updated_content = replace(updated_content, r"(```sh_run_results\n.*?```)((\s*```sh_run_results\n.*?```)*)"s => s"\1")
+        # update_message_by_idx(ai_state, idx, updated_content)
         
         OK("Code block executed successfully", Dict("result" => result, "updated_content" => updated_content))
     catch e
