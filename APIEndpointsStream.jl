@@ -4,7 +4,10 @@ HTTP.register!(ROUTER_Stream, "POST", "/stream/process_message", function(stream
         user_message = get(data, "new_message", "")
         shell_results = Dict{String, CodeBlock}()
 
-        channel, shell_scripts, e = streaming_process_question(ai_state, user_message, shell_results,
+        user_msg = prepare_user_message!(ai_state.contexter, ai_state, user_question, shell_results)
+        add_n_save_user_message!(ai_state, user_msg)
+
+        channel, shell_scripts, e = streaming_process_question(ai_state,
             on_start = sonstart() = begin
                 write(stream, "event: start\ndata: $(json(Dict("content" => "Stream started")))\n\n")
                 write(stream, "event: ping\ndata: $(round(Int, time()))\n\n")
